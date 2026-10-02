@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>努力翻身 · 收支记账</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f2f5f9; margin: 0; padding: 22px 16px 44px; color: #1e2b3c;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* 顶部 */
+  .topbar {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  h1 { font-size: 21px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.3px; }
+  .sub { font-size: 13px; color: #6b7c93; }
+  .save-status {
+    font-size: 12.5px; font-weight: 600; color: #1f7a52;
+    background: #eaf7f0; border: 1px solid #cdecdb;
+    padding: 5px 12px; border-radius: 20px; opacity: .85;
+    transition: all .2s;
+  }
+  .save-status.flash { opacity: 1; background: #d9f2e5; transform: scale(1.04); }
+
+  /* 卡片 */
+  .cards { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+  .card {
+    flex: 1 1 180px; background: #fff; border-radius: 12px;
+    padding: 15px 20px; box-shadow: 0 1px 3px rgba(30,43,60,.07);
+    border-left: 4px solid #cbd5e1;
+  }
+  .card.income  { border-left-color: #2e9e6b; }
+  .card.expense { border-left-color: #d9534f; }
+  .card.balance { border-left-color: #3b7ddd; }
+  .card .label { font-size: 12px; color: #6b7c93; letter-spacing: .4px; margin-bottom: 6px; }
+  .card .value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .card.income  .value { color: #1f7a52; }
+  .card.expense .value { color: #b93b37; }
+  .card.balance .value { color: #2a5fa8; }
+  .card .value.neg { color: #b93b37; }
+
+  @keyframes pulseAnim {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.07); }
+    100% { transform: scale(1); }
+  }
+  .pulse { animation: pulseAnim .3s ease; }
+
+  /* 面板 */
+  .panel {
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(30,43,60,.07);
+    overflow: hidden; margin-bottom: 20px;
+  }
+  .panel-head {
+    padding: 14px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .panel-head h2 { font-size: 15px; font-weight: 700; margin: 0; }
+  .hint { font-size: 12px; color: #8a9bb0; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th {
+    background: #f7f9fc; color: #55677e; font-weight: 600;
+    font-size: 12.5px; letter-spacing: .3px; text-align: left;
+    padding: 9px 10px; border-bottom: 1px solid #e6ecf3; white-space: nowrap;
+  }
+  tbody td { padding: 4px 6px; border-bottom: 1px solid #eef2f7; vertical-align: middle; }
+  tbody tr:hover td { background: #fafcff; }
+
+  input, select {
+    width: 100%; border: 1px solid transparent; background: transparent;
+    padding: 7px 8px; font-size: 13.5px; font-family: inherit;
+    color: #1e2b3c; border-radius: 6px; outline: none;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  input:hover { background: #f4f7fb; }
+  input:focus {
+    border-color: #3b7ddd; background: #fff;
+    box-shadow: 0 0 0 3px rgba(59,125,221,.12);
+  }
+  input[type="date"] { color-scheme: light; }
+  input.num { text-align: right; font-variant-numeric: tabular-nums; }
+  input.num::-webkit-outer-spin-button,
+  input.num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input.num { -moz-appearance: textfield; }
+
+  /* 类型下拉 */
+  select.type-sel {
+    cursor: pointer; font-weight: 700; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7c93' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 6px center; background-size: 10px;
+    padding-right: 22px;
+  }
+  select.type-sel:hover { background-color: #f4f7fb; }
+  select.type-sel:focus {
+    border-color: #3b7ddd; background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(59,125,221,.12);
+  }
+  tr[data-type="income"]  .amt-input { border-color: #d5ece0; background: #f7fdfa; }
+  tr[data-type="expense"] .amt-input { border-color: #f6dbd9; background: #fffafa; }
+  tr[data-type="income"]  .amt-input:focus { border-color: #2e9e6b; box-shadow: 0 0 0 3px rgba(46,158,107,.14); }
+  tr[data-type="expense"] .amt-input:focus { border-color: #d9534f; box-shadow: 0 0 0 3px rgba(217,83,79,.13); }
+
+  .ro {
+    text-align: right; font-variant-numeric: tabular-nums;
+    padding: 7px 10px; color: #55677e; font-weight: 600; white-space: nowrap;
+  }
+  .ro.neg { color: #b93b37; }
+
+  tfoot td {
+    background: #f7f9fc; font-weight: 700; padding: 11px 10px;
+    border-top: 1px solid #dde5ef; font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  tfoot td.num, tfoot td.ro { text-align: right; }
+  .tlabel { color: #55677e; letter-spacing: .5px; font-size: 12.5px; }
+  #footIncome  { color: #1f7a52; }
+  #footExpense { color: #b93b37; }
+  #footBalance { color: #2a5fa8; }
+  #footBalance.neg { color: #b93b37; }
+
+  /* 分页条 */
+  .pager {
+    display: flex; align-items: center; justify-content: center;
+    gap: 14px; padding: 14px 20px 18px;
+    border-top: 1px solid #eef2f7; flex-wrap: wrap;
+    background: #fcfdfe;
+  }
+  .pager .pg-btn {
+    border: 1px solid #d5dfea; background: #fff; color: #3b5a7d;
+    padding: 6px 16px; border-radius: 7px; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: all .15s;
+  }
+  .pager .pg-btn:hover:not(:disabled) { background: #f2f7fd; border-color: #b6c9e0; }
+  .pager .pg-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .pager .pg-info {
+    font-size: 13px; color: #55677e; font-variant-numeric: tabular-nums;
+    min-width: 110px; text-align: center;
+  }
+  .pager .pg-info b { color: #3b7ddd; font-weight: 700; }
+  .pager .pg-count { font-size: 12.5px; color: #8a9bb0; }
+
+  /* 按钮 */
+  .btn {
+    border: 1px solid #d5dfea; background: #fff; color: #3b5a7d;
+    padding: 7px 13px; border-radius: 7px; font-size: 12.5px;
+    font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  .btn:hover { background: #f2f7fd; border-color: #b6c9e0; }
+  .btn.danger { color: #b93b37; }
+  .btn.danger:hover { background: #fdf2f2; border-color: #e8b9b7; }
+
+  .col-actions { text-align: center; width: 58px; }
+  .del {
+    background: none; border: none; color: #b0bfd0; font-size: 18px;
+    line-height: 1; cursor: pointer; padding: 4px 9px; border-radius: 6px;
+    transition: all .15s;
+  }
+  .del:hover { color: #d9534f; background: #fdf2f2; }
+
+  /* 汇总区 */
+  .summary-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    padding: 4px 20px 20px;
+  }
+  @media (max-width: 760px) { .summary-grid { grid-template-columns: 1fr; } }
+
+  .sum-block { border: 1px solid #e9eff6; border-radius: 10px; overflow: hidden; }
+  .sum-block-head {
+    padding: 10px 14px; font-size: 13px; font-weight: 700;
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f7fafd; font-variant-numeric: tabular-nums;
+  }
+  .sum-block.income  .sum-block-head { color: #1f7a52; background: #f3fbf7; }
+  .sum-block.expense .sum-block-head { color: #b93b37; background: #fdf6f6; }
+  .sum-list { padding: 8px 14px 12px; }
+  .sum-empty { padding: 12px 0 16px; font-size: 12.5px; color: #9aa9bb; text-align: center; }
+
+  .sum-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
+  .sum-name {
+    min-width: 66px; max-width: 130px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600; color: #3d4f66;
+  }
+  .sum-bar-wrap {
+    flex: 1; height: 6px; background: #eef2f8;
+    border-radius: 3px; overflow: hidden; min-width: 36px;
+  }
+  .sum-bar { height: 100%; border-radius: 3px; transition: width .28s ease; }
+  .sum-bar.in { background: linear-gradient(90deg, #4fbf8b, #2e9e6b); }
+  .sum-bar.ex { background: linear-gradient(90deg, #e8746f, #d9534f); }
+  .sum-amt {
+    font-variant-numeric: tabular-nums; font-weight: 700;
+    min-width: 92px; text-align: right; white-space: nowrap;
+  }
+  .sum-amt.in { color: #1f7a52; }
+  .sum-amt.ex { color: #b93b37; }
+
+  .scroll-x { overflow-x: auto; }
+  @media (max-width: 780px) { table { min-width: 700px; } }
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f2f5f9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="努力翻身">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div>
+      <h1>努力翻身 · 收支记账</h1>
+      <div class="sub">下拉选择「收入 / 支出」· 按摘要自动汇总 · 数据自动保存在本机</div>
+    </div>
+    <div class="save-status" id="saveStatus">✓ 已自动保存</div>
+  </div>
+
+  <div class="cards">
+    <div class="card income">
+      <div class="label">总收入</div>
+      <div class="value" id="sumIncome">¥0.00</div>
+    </div>
+    <div class="card expense">
+      <div class="label">总支出</div>
+      <div class="value" id="sumExpense">¥0.00</div>
+    </div>
+    <div class="card balance">
+      <div class="label">总结余</div>
+      <div class="value" id="sumBalance">¥0.00</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>收支明细 <span class="hint" id="totalCount" style="font-weight:400;"></span></h2>
+      <div class="tools">
+        <button class="btn" id="addRowBtn">+ 添加一行</button>
+        <button class="btn" id="exportBtn">导出备份</button>
+        <button class="btn" id="importBtn">导入恢复</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+        <button class="btn danger" id="clearBtn">清空全部</button>
+      </div>
+    </div>
+
+    <div class="scroll-x">
+      <table id="ledger">
+        <thead>
+          <tr>
+            <th style="width:120px;">日期</th>
+            <th style="width:96px;">类型</th>
+            <th style="min-width:190px;">摘要 / 备注</th>
+            <th style="width:132px;">金额</th>
+            <th style="width:124px;">结余</th>
+            <th class="col-actions">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="tlabel">合计</td>
+            <td class="num" id="footIncome" style="text-align:right;">收入 ¥0.00</td>
+            <td class="ro" id="footBalance">¥0.00</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="3" class="tlabel" style="border-top:none;padding-top:0;"></td>
+            <td class="num" id="footExpense" style="text-align:right;border-top:none;padding-top:0;">支出 ¥0.00</td>
+            <td style="border-top:none;padding-top:0;"></td>
+            <td style="border-top:none;padding-top:0;"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- 分页条 -->
+    <div class="pager" id="pager">
+      <button class="pg-btn" id="prevBtn">‹ 上一页</button>
+      <span class="pg-info" id="pageInfo">第 <b>1</b> / 1 页</span>
+      <button class="pg-btn" id="nextBtn">下一页 ›</button>
+      <span class="pg-count" id="pageCount">共 0 条记录，每页 10 条</span>
+    </div>
+
+    <div class="hint" style="padding:0 20px 16px;">
+      提示：选择「收入」或「支出」后填入金额；相同摘要会自动合并统计到下方分类汇总。
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>分类汇总（按摘要）</h2>
+      <span class="hint">收入、支出两大类，组内按摘要统计（全部数据）</span>
+    </div>
+    <div class="summary-grid">
+      <div class="sum-block income">
+        <div class="sum-block-head"><span>收入</span><span id="incBlockTotal">¥0.00</span></div>
+        <div class="sum-list" id="incomeBlock"></div>
+      </div>
+      <div class="sum-block expense">
+        <div class="sum-block-head"><span>支出</span><span id="expBlockTotal">¥0.00</span></div>
+        <div class="sum-list" id="expenseBlock"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "ledger_summary_v4";
+  var OLD_KEY     = "ledger_summary_v3";
+  var PAGE_SIZE   = 10;
+
+  var tbody        = document.getElementById("tbody");
+  var incomeBlock  = document.getElementById("incomeBlock");
+  var expenseBlock = document.getElementById("expenseBlock");
+
+  var elSumIncome  = document.getElementById("sumIncome");
+  var elSumExpense = document.getElementById("sumExpense");
+  var elSumBalance = document.getElementById("sumBalance");
+
+  var elFootIncome  = document.getElementById("footIncome");
+  var elFootExpense = document.getElementById("footExpense");
+  var elFootBalance = document.getElementById("footBalance");
+
+  var elIncBlockTotal = document.getElementById("incBlockTotal");
+  var elExpBlockTotal = document.getElementById("expBlockTotal");
+  var elSaveStatus    = document.getElementById("saveStatus");
+  var elTotalCount    = document.getElementById("totalCount");
+
+  var prevBtn    = document.getElementById("prevBtn");
+  var nextBtn    = document.getElementById("nextBtn");
+  var pageInfo   = document.getElementById("pageInfo");
+  var pageCount  = document.getElementById("pageCount");
+
+  /* ---------- 工具 ---------- */
+  function uid() {
+    return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + "-" +
+           String(d.getMonth() + 1).padStart(2, "0") + "-" +
+           String(d.getDate()).padStart(2, "0");
+  }
+  function num(v) {
+    var n = parseFloat(v);
+    return (isNaN(n) || !isFinite(n)) ? 0 : n;
+  }
+  function fmt(n) {
+    var neg = n < 0;
+    var s = Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (neg ? "-¥" : "¥") + s;
+  }
+  function escapeAttr(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function pulse(el) {
+    el.classList.remove("pulse");
+    void el.offsetWidth;
+    el.classList.add("pulse");
+  }
+
+  /* ---------- 分页状态 ---------- */
+  var currentPage = 1;
+  function totalPages() {
+    return Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  }
+  function clampPage() {
+    if (currentPage > totalPages()) currentPage = totalPages();
+    if (currentPage < 1) currentPage = 1;
+  }
+
+  /* ---------- 数据读取 ---------- */
+  function blankRow() {
+    return { id: uid(), date: todayStr(), type: "expense", note: "", amount: "" };
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw !== null) {
+        var p = JSON.parse(raw);
+        if (Array.isArray(p)) {
+          return p.map(function (r) {
+            return {
+              id: r.id || uid(),
+              date: r.date || "",
+              type: r.type === "income" ? "income" : "expense",
+              note: r.note || "",
+              amount: (r.amount === undefined || r.amount === null) ? "" : r.amount
+            };
+          });
+        }
+      }
+    } catch (e) {}
+
+    // 从 v3 迁移
+    try {
+      var old = localStorage.getItem(OLD_KEY);
+      if (old) {
+        var arr = JSON.parse(old);
+        if (Array.isArray(arr)) {
+          return arr.map(function (r) {
+            return {
+              id: r.id || uid(),
+              date: r.date || "",
+              type: r.type === "income" ? "income" : "expense",
+              note: r.note || "",
+              amount: (r.amount === undefined || r.amount === null) ? "" : r.amount
+            };
+          });
+        }
+      }
+    } catch (e) {}
+
+    return null;
+  }
+
+  var rows = load();
+  if (rows === null) {
+    rows = [ blankRow() ];
+  }
+
+  /* ---------- 保存 ---------- */
+  var flashTimer = null;
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+      elSaveStatus.textContent = "✓ 已自动保存";
+      elSaveStatus.style.color = "#1f7a52";
+      elSaveStatus.style.background = "#eaf7f0";
+      elSaveStatus.style.borderColor = "#cdecdb";
+      elSaveStatus.classList.add("flash");
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(function () {
+        elSaveStatus.classList.remove("flash");
+      }, 500);
+    } catch (e) {
+      elSaveStatus.textContent = "⚠ 本机存储不可用";
+      elSaveStatus.style.color = "#b93b37";
+      elSaveStatus.style.background = "#fdf2f2";
+      elSaveStatus.style.borderColor = "#e8b9b7";
+    }
+  }
+
+  /* ---------- 计算每行累计结余（全部数据） ---------- */
+  function computeBalanceMap() {
+    var map = {};
+    var run = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      run += (r.type === "income" ? num(r.amount) : -num(r.amount));
+      map[r.id] = run;
+    }
+    return map;
+  }
+
+  /* ---------- 渲染当前页表格（增删行 / 翻页时调用） ---------- */
+  function render() {
+    clampPage();
+    var start = (currentPage - 1) * PAGE_SIZE;
+    var end   = Math.min(start + PAGE_SIZE, rows.length);
+    var pageRows = rows.slice(start, end);
+
+    var html = "";
+    pageRows.forEach(function (r) {
+      var t = r.type === "income" ? "income" : "expense";
+      html += '<tr data-id="' + r.id + '" data-type="' + t + '">';
+      html += '<td><input type="date" data-field="date" value="' + escapeAttr(r.date) + '"></td>';
+      html += '<td><select class="type-sel" data-field="type">' +
+                '<option value="income"'  + (t === "income"  ? " selected" : "") + '>收入</option>' +
+                '<option value="expense"' + (t === "expense" ? " selected" : "") + '>支出</option>' +
+              '</select></td>';
+      html += '<td><input type="text" data-field="note" placeholder="摘要 / 备注（相同摘要会自动合并）" value="' + escapeAttr(r.note) + '"></td>';
+      html += '<td><input type="number" class="num amt-input" data-field="amount" min="0" step="0.01" placeholder="0.00" value="' + (r.amount === "" ? "" : escapeAttr(r.amount)) + '"></td>';
+      html += '<td class="ro" data-balance>¥0.00</td>';
+      html += '<td class="col-actions"><button class="del" data-del title="删除本行">×</button></td>';
+      html += '</tr>';
+    });
+    tbody.innerHTML = html;
+
+    refresh(true);
+    renderPager();
+  }
+
+  /* ---------- 翻页条渲染 ---------- */
+  function renderPager() {
+    var tp = totalPages();
+    pageInfo.innerHTML = '第 <b>' + currentPage + '</b> / ' + tp + ' 页';
+    pageCount.textContent = "共 " + rows.length + " 条记录，每页 " + PAGE_SIZE + " 条";
+    elTotalCount.textContent = rows.length ? "（共 " + rows.length + " 条）" : "";
+    prevBtn.disabled = (currentPage <= 1);
+    nextBtn.disabled = (currentPage >= tp);
+  }
+
+  /* ---------- 实时刷新（输入时调用，不重建 DOM） ---------- */
+  function refresh(animate) {
+    var totalIn = 0, totalEx = 0;
+    var incMap = {}, expMap = {};
+
+    rows.forEach(function (r) {
+      var amt = num(r.amount);
+      var isInc = (r.type === "income");
+      if (isInc) totalIn += amt; else totalEx += amt;
+
+      var key = (r.note || "").trim() || "（无摘要）";
+      if (amt > 0) {
+        if (isInc) incMap[key] = (incMap[key] || 0) + amt;
+        else       expMap[key] = (expMap[key] || 0) + amt;
+      }
+    });
+
+    // 回填每行结余（基于全部数据的累计，保证翻页后数字也正确）
+    var balMap = computeBalanceMap();
+    Array.prototype.forEach.call(tbody.rows, function (tr) {
+      var id = tr.getAttribute("data-id");
+      var cell = tr.querySelector("[data-balance]");
+      if (cell && balMap[id] !== undefined) {
+        cell.textContent = fmt(balMap[id]);
+        cell.classList.toggle("neg", balMap[id] < 0);
+      }
+    });
+
+    var bal = totalIn - totalEx;
+
+    elSumIncome.textContent  = fmt(totalIn);
+    elSumExpense.textContent = fmt(totalEx);
+    elSumBalance.textContent = fmt(bal);
+    elSumBalance.classList.toggle("neg", bal < 0);
+
+    elFootIncome.textContent  = "收入 " + fmt(totalIn);
+    elFootExpense.textContent = "支出 " + fmt(totalEx);
+    elFootBalance.textContent = fmt(bal);
+    elFootBalance.classList.toggle("neg", bal < 0);
+
+    renderBlock(incomeBlock,  elIncBlockTotal, incMap, "in", "暂无收入");
+    renderBlock(expenseBlock, elExpBlockTotal, expMap, "ex", "暂无支出");
+
+    if (animate) {
+      pulse(elSumIncome);
+      pulse(elSumExpense);
+      pulse(elSumBalance);
+    }
+
+    save();
+  }
+
+  function renderBlock(box, totalEl, map, cls, emptyText) {
+    var keys = Object.keys(map).sort(function (a, b) { return map[b] - map[a]; });
+    var total = 0;
+    keys.forEach(function (k) { total += map[k]; });
+    totalEl.textContent = fmt(total);
+
+    if (!keys.length) {
+      box.innerHTML = '<div class="sum-empty">' + emptyText + '</div>';
+      return;
+    }
+
+    var max = map[keys[0]] || 1;
+    var html = "";
+    keys.forEach(function (k) {
+      var v = map[k];
+      var pct = Math.max(4, (v / max) * 100);
+      html += '<div class="sum-item">';
+      html += '<span class="sum-name" title="' + escapeAttr(k) + '">' + escapeAttr(k) + '</span>';
+      html += '<span class="sum-bar-wrap"><span class="sum-bar ' + cls + '" style="width:' + pct.toFixed(1) + '%"></span></span>';
+      html += '<span class="sum-amt ' + cls + '">' + fmt(v) + '</span>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  }
+
+  /* ---------- 统一输入处理 ---------- */
+  function handleInput(e) {
+    var el = e.target;
+    var field = el.getAttribute && el.getAttribute("data-field");
+    if (!field) return;
+
+    var tr = el.closest("tr");
+    if (!tr) return;
+    var id = tr.getAttribute("data-id");
+
+    var row = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id === id) { row = rows[i]; break; }
+    }
+    if (!row) return;
+
+    if (field === "amount") {
+      if (el.value !== "") {
+        var v = parseFloat(el.value);
+        if (!isNaN(v) && v < 0) { el.value = Math.abs(v); }
+      }
+      row.amount = el.value;
+    } else if (field === "type") {
+      row.type = (el.value === "income") ? "income" : "expense";
+      tr.setAttribute("data-type", row.type);
+    } else if (field === "note") {
+      row.note = el.value;
+    } else if (field === "date") {
+      row.date = el.value;
+    }
+
+    refresh(true);
+  }
+
+  tbody.addEventListener("input",  handleInput);
+  tbody.addEventListener("change", handleInput);
+
+  /* ---------- 删除行 ---------- */
+  tbody.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-del]");
+    if (!btn) return;
+    var tr = btn.closest("tr");
+    var id = tr.getAttribute("data-id");
+    var idx = -1;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id === id) { idx = i; break; }
+    }
+    if (idx === -1) return;
+    rows.splice(idx, 1);
+    render();
+  });
+
+  /* ---------- 翻页按钮 ---------- */
+  prevBtn.addEventListener("click", function () {
+    if (currentPage > 1) {
+      currentPage--;
+      render();
+    }
+  });
+  nextBtn.addEventListener("click", function () {
+    if (currentPage < totalPages()) {
+      currentPage++;
+      render();
+    }
+  });
+
+  /* ---------- 其他按钮 ---------- */
+  document.getElementById("addRowBtn").addEventListener("click", function () {
+    rows.push(blankRow());
+    // 跳到最后一页，让新行可见
+    currentPage = totalPages();
+    render();
+    var lastTr = tbody.rows[tbody.rows.length - 1];
+    if (lastTr) {
+      var noteInput = lastTr.querySelector('input[data-field="note"]');
+      if (noteInput) noteInput.focus();
+    }
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", function () {
+    if (!rows.length) return;
+    if (confirm("确定清空所有明细吗？清空后无法恢复。")) {
+      rows = [];
+      currentPage = 1;
+      render();
+    }
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "收支备份_" + todayStr() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  var importFile = document.getElementById("importFile");
+  document.getElementById("importBtn").addEventListener("click", function () {
+    importFile.click();
+  });
+  importFile.addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (!Array.isArray(data)) { alert("文件格式不正确。"); return; }
+        rows = data.map(function (r) {
+          return {
+            id: r.id || uid(),
+            date: r.date || "",
+            type: r.type === "income" ? "income" : "expense",
+            note: r.note || "",
+            amount: (r.amount === undefined || r.amount === null) ? "" : r.amount
+          };
+        });
+        currentPage = 1;
+        render();
+        alert("导入成功，共 " + rows.length + " 条记录。");
+      } catch (err) {
+        alert("读取失败，不是有效的备份文件。");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  /* ---------- 启动 ---------- */
+  render();
+
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function () {});
+  });
+}
+</script>
+
+</body>
+</html>
